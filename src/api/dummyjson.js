@@ -6,13 +6,23 @@ const api = axios.create({
   timeout: 15000,
 })
 
+// Fail fast when the browser knows it is offline, instead of risking a stale cached response.
+api.interceptors.request.use((config) => {
+  if (!navigator.onLine) {
+    return Promise.reject(new axios.AxiosError('Browser is offline', 'ERR_OFFLINE', config))
+  }
+  return config
+})
+
 // Turn axios errors into one readable message; cancelled requests pass through untouched.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isCancel(error)) return Promise.reject(error)
     let message
-    if (error.response) {
+    if (error.code === 'ERR_OFFLINE' || !navigator.onLine) {
+      message = "You're offline. Reconnect to the internet and try again."
+    } else if (error.response) {
       message = error.response.data?.message || `Request failed with status ${error.response.status}`
     } else if (error.code === 'ECONNABORTED') {
       message = 'The server took too long to respond. Please try again.'

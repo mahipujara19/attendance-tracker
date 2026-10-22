@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useEmployees } from '../hooks/useApp'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { formatLong, todayKey } from '../utils/date'
 import Icon from './Icon'
 
@@ -32,6 +33,7 @@ export default function Layout() {
   const { pathname } = useLocation()
   const { toggle } = useTheme()
   const { employees, status } = useEmployees()
+  const online = useOnlineStatus()
 
   // Close the mobile drawer when navigating.
   const [lastPath, setLastPath] = useState(pathname)
@@ -88,6 +90,15 @@ export default function Layout() {
           </span>
           <strong>Attendly</strong>
         </header>
+        {!online && (
+          <div className="offline-banner" role="alert">
+            <Icon name="wifiOff" size={16} />
+            <span>
+              <strong>You're offline.</strong> Attendance still saves on this device, but adding or removing
+              employees won't work until you reconnect.
+            </span>
+          </div>
+        )}
         <main className="content">
           <Outlet />
         </main>

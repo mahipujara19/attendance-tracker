@@ -5,11 +5,12 @@ import Icon from '../components/Icon'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { DepartmentSelect, SearchInput } from '../components/Toolbar'
 import { useAttendance, useEmployees, useToast } from '../hooks/useApp'
+import { isWeekend } from '../utils/date'
 import { matchesQuery } from '../utils/filters'
 
 export default function Employees() {
-  const { employees, departments, status, error, retry, removeEmployee, restoreDefaults, removedCount } = useEmployees()
-  const { records, purgeEmployee } = useAttendance()
+  const { employees, departments, status, error, retry, removeEmployee, restoreRemoved, removedCount } = useEmployees()
+  const { records } = useAttendance()
   const { notify } = useToast()
   const [query, setQuery] = useState('')
   const [department, setDepartment] = useState('all')
@@ -18,7 +19,8 @@ export default function Employees() {
 
   const totals = useMemo(() => {
     const map = {}
-    Object.values(records).forEach((day) => {
+    Object.entries(records).forEach(([date, day]) => {
+      if (isWeekend(date)) return
       Object.entries(day).forEach(([id, value]) => {
         map[id] ??= { present: 0, absent: 0 }
         map[id][value]++
@@ -36,7 +38,6 @@ export default function Employees() {
     setRemoval({ employee, status: 'pending' })
     try {
       await removeEmployee(employee)
-      purgeEmployee(employee.id)
       setRemoval(null)
       notify(`${employee.name} was removed`)
     } catch (err) {
@@ -58,7 +59,7 @@ export default function Employees() {
             <button
               className="btn btn-ghost"
               onClick={() => {
-                restoreDefaults()
+                restoreRemoved()
                 notify(`Restored ${removedCount} removed ${removedCount === 1 ? 'employee' : 'employees'}`, 'info')
               }}
             >
@@ -139,7 +140,7 @@ export default function Employees() {
       {removal && (
         <ConfirmDialog
           title={`Remove ${removal.employee.name}?`}
-          message="They'll be removed from the team along with their attendance history."
+          message={`They'll be hidden from the team. You can bring them back, with their attendance history, using "Restore removed".`}
           confirmLabel="Remove"
           pending={removal.status === 'pending'}
           error={removal.status === 'error' ? `Couldn't remove employee: ${removal.error}` : null}

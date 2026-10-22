@@ -700,3 +700,45 @@ button, input, select { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Offline banner ---------- */
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 32px;
+  background: var(--critical-soft);
+  color: var(--critical-text);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+@media (max-width: 860px) {
+  .offline-banner { top: 57px; padding: 10px 16px; }
+}
+
+/* ---------- Weekly off ---------- */
+.weekly-off-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+.weekly-off-note .icon { color: var(--accent-text); }
+.weekly-off-label {
+  display: flex;
+  align-items: center;
+  height: 12px;
+  color: var(--text-3);
+  font-style: italic;
+}
+.toggle-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.toggle-btn.present:disabled:hover { border-color: var(--border-strong); color: var(--text-2); }
+.toggle-btn.absent:disabled:hover { border-color: var(--border-strong); color: var(--text-2); }
+.toggle-btn.active:disabled:hover { color: #fff; }

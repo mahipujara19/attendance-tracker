@@ -78,6 +78,8 @@ export default function Reports() {
           : null
 
   const days = useMemo(() => (rangeError ? [] : listDays(from, to)), [from, to, rangeError])
+  // Weekends are a weekly off: they're shown in the breakdown but never counted.
+  const workdays = useMemo(() => days.filter((date) => !isWeekend(date)), [days])
 
   const scoped = useMemo(
     () => employees.filter((e) => department === 'all' || e.department === department),
@@ -87,6 +89,7 @@ export default function Reports() {
   const daily = useMemo(
     () =>
       days.map((date) => {
+        if (isWeekend(date)) return { date, weeklyOff: true, present: 0, absent: 0, unmarked: 0 }
         let present = 0
         let absent = 0
         scoped.forEach((e) => {
@@ -104,14 +107,14 @@ export default function Reports() {
       scoped.map((e) => {
         let present = 0
         let absent = 0
-        days.forEach((date) => {
+        workdays.forEach((date) => {
           const value = records[date]?.[e.id]
           if (value === 'present') present++
           else if (value === 'absent') absent++
         })
-        return { employee: e, name: e.name, department: e.department, present, absent, unmarked: days.length - present - absent, rate: pct(present, absent) }
+        return { employee: e, name: e.name, department: e.department, present, absent, unmarked: workdays.length - present - absent, rate: pct(present, absent) }
       }),
-    [scoped, days, records],
+    [scoped, workdays, records],
   )
 
   const totals = daily.reduce(
@@ -213,9 +216,7 @@ export default function Reports() {
         <>
           <section className="stats-grid" aria-label="Report summary">
             <StatCard icon="percent" label="Attendance rate" value={overallRate === null ? '–' : `${overallRate}%`} hint="present ÷ marked" tone="accent" />
-            <StatCard icon="check" label="Present marks" value={totals.present} tone="good" />
-            <StatCard icon="x" label="Absent marks" value={totals.absent} tone="critical" />
-            <StatCard icon="calendar" label="Days tracked" value={`${totals.tracked}/${days.length}`} hint="days with any marks" />
+            <StatCard icon="calendar" label="Days tracked" value={`${totals.tracked}/${workdays.length}`} hint="working days with marks" />
           </section>
 
           <div className="report-grid">
@@ -230,11 +231,20 @@ export default function Reports() {
               </div>
               <ul className="daily-list">
                 {[...daily].reverse().map((d) => {
+                  if (d.weeklyOff) {
+                    return (
+                      <li key={d.date} className="daily-row weekend" title={`${formatShort(d.date)}: weekly off`}>
+                        <span className="daily-date small">{formatShort(d.date)}</span>
+                        <span className="weekly-off-label small">Weekly off</span>
+                        <span className="daily-rate small muted">—</span>
+                      </li>
+                    )
+                  }
                   const rate = pct(d.present, d.absent)
                   return (
                     <li
                       key={d.date}
-                      className={`daily-row ${isWeekend(d.date) ? 'weekend' : ''}`}
+                      className="daily-row"
                       title={`${formatShort(d.date)}: ${d.present} present, ${d.absent} absent, ${d.unmarked} not marked`}
                     >
                       <span className="daily-date small">{formatShort(d.date)}</span>

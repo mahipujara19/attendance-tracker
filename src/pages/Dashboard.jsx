@@ -16,13 +16,14 @@ const STATUS_FILTERS = [
   { id: 'absent', label: 'Absent' },
 ]
 
-function AttendanceToggle({ status, onMark, name }) {
+function AttendanceToggle({ status, onMark, name, disabled }) {
   return (
     <div className="toggle" role="group" aria-label={`Attendance for ${name}`}>
       <button
         className={`toggle-btn present ${status === 'present' ? 'active' : ''}`}
         aria-pressed={status === 'present'}
         onClick={() => onMark('present')}
+        disabled={disabled}
       >
         <Icon name="check" size={16} /> Present
       </button>
@@ -30,6 +31,7 @@ function AttendanceToggle({ status, onMark, name }) {
         className={`toggle-btn absent ${status === 'absent' ? 'active' : ''}`}
         aria-pressed={status === 'absent'}
         onClick={() => onMark('absent')}
+        disabled={disabled}
       >
         <Icon name="x" size={16} /> Absent
       </button>
@@ -51,6 +53,7 @@ export default function Dashboard() {
   const requested = searchParams.get('date')
   const date = isValidKey(requested) && requested <= today ? requested : today
   const isToday = date === today
+  const weeklyOff = isWeekend(date)
   const day = useMemo(() => records[date] ?? {}, [records, date])
 
   const setDate = (key) => setSearchParams(key === today ? {} : { date: key })
@@ -83,14 +86,18 @@ export default function Dashboard() {
   const isFiltered = query || department !== 'all' || statusFilter !== 'all'
   const completion = stats.total ? Math.round((stats.marked / stats.total) * 100) : 0
 
-  const markVisible = (value) => {
-    const ids = visible.map((e) => e.id)
-    markMany(date, ids, value)
-    notify(`Marked ${ids.length} ${ids.length === 1 ? 'person' : 'people'} ${value}`)
+  const toMarkPresent = visible.filter((e) => day[e.id] !== 'present')
+
+  const markVisiblePresent = () => {
+    if (weeklyOff || toMarkPresent.length === 0) return
+    const ids = toMarkPresent.map((e) => e.id)
+    markMany(date, ids, 'present')
+    notify(`Marked ${ids.length} ${ids.length === 1 ? 'person' : 'people'} present`)
   }
 
   const markRemainingAbsent = () => {
     const ids = employees.filter((e) => !day[e.id]).map((e) => e.id)
+    if (weeklyOff || ids.length === 0) return
     markMany(date, ids, 'absent')
     notify(`Marked ${ids.length} remaining ${ids.length === 1 ? 'person' : 'people'} absent`)
   }
@@ -136,9 +143,9 @@ export default function Dashboard() {
         <div>
           <strong>{isToday ? 'Today' : formatLong(date)}</strong>
           {isToday && <span className="muted"> · {formatLong(date)}</span>}
-          {isWeekend(date) && <span className="chip">Weekend</span>}
+          {weeklyOff && <span className="chip chip-accent">Weekly off</span>}
         </div>
-        {status === 'success' && stats.total > 0 && (
+        {status === 'success' && stats.total > 0 && !weeklyOff && (
           <div className="progress-wrap" title={`${stats.marked} of ${stats.total} marked`}>
             <span className="small muted">
               {stats.marked}/{stats.total} marked
@@ -158,8 +165,8 @@ export default function Dashboard() {
         <StatCard
           icon="percent"
           label="Attendance rate"
-          value={stats.rate === null ? '–' : `${stats.rate}%`}
-          hint={stats.rate === null ? 'Nobody marked yet' : 'of people marked'}
+          value={weeklyOff ? 'Off' : stats.rate === null ? '–' : `${stats.rate}%`}
+          hint={weeklyOff ? 'Weekends are not counted' : stats.rate === null ? 'Nobody marked yet' : 'of people marked'}
           tone="accent"
         />
       </section>
@@ -189,16 +196,26 @@ export default function Dashboard() {
               Showing {visible.length} of {employees.length}
             </span>
             <div className="bulk-actions">
-              <button className="btn btn-soft-good" onClick={() => markVisible('present')} disabled={!visible.length}>
+              <button className="btn btn-soft-good" onClick={markVisiblePresent} disabled={weeklyOff || !toMarkPresent.length}>
                 <Icon name="check" size={16} /> {isFiltered ? 'Mark shown present' : 'Mark all present'}
               </button>
-              <button className="btn btn-soft-critical" onClick={markRemainingAbsent} disabled={!stats.unmarked}>
+              <button className="btn btn-soft-critical" onClick={markRemainingAbsent} disabled={weeklyOff || !stats.unmarked}>
                 <Icon name="x" size={16} /> Mark rest absent
               </button>
               <button className="btn btn-ghost" onClick={() => setConfirmClear(true)} disabled={!stats.marked}>
                 <Icon name="undo" size={16} /> Reset day
               </button>
             </div>
+          </div>
+        )}
+
+        {status === 'success' && employees.length > 0 && weeklyOff && (
+          <div className="weekly-off-note">
+            <Icon name="calendar" size={16} />
+            <span>
+              <strong>{formatLong(date).split(',')[0]} is a weekly off.</strong> Attendance can't be marked on weekends
+              and they don't count toward attendance percentages.
+            </span>
           </div>
         )}
 
@@ -241,7 +258,8 @@ export default function Dashboard() {
                   <AttendanceToggle
                     status={current}
                     name={employee.name}
-                    onMark={(value) => mark(date, employee.id, value)}
+                    disabled={weeklyOff}
+                    onMark={(value) => !weeklyOff && mark(date, employee.id, value)}
                   />
                 </li>
               )

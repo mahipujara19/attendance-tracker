@@ -43,24 +43,9 @@ export default function AttendanceProvider({ children }) {
     [setRecords],
   )
 
-  const purgeEmployee = useCallback(
-    (employeeId) => {
-      setRecords((prev) => {
-        const next = {}
-        Object.entries(prev).forEach(([date, day]) => {
-          const rest = { ...day }
-          delete rest[employeeId]
-          next[date] = rest
-        })
-        return next
-      })
-    },
-    [setRecords],
-  )
-
   const value = useMemo(
-    () => ({ records, mark, markMany, clearDay, purgeEmployee }),
-    [records, mark, markMany, clearDay, purgeEmployee],
+    () => ({ records, mark, markMany, clearDay }),
+    [records, mark, markMany, clearDay],
   )
 
   return <AttendanceContext.Provider value={value}>{children}</AttendanceContext.Provider>

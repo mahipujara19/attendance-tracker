@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import Icon from '../components/Icon'
 import { ToastContext } from './contexts'
 
@@ -6,14 +6,22 @@ const ICONS = { success: 'check', error: 'alert', info: 'info' }
 
 export default function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
+  // Messages currently on screen, so rapid repeat clicks don't stack identical toasts.
+  const activeKeys = useRef(new Map())
 
   const dismiss = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
+    activeKeys.current.forEach((toastId, key) => {
+      if (toastId === id) activeKeys.current.delete(key)
+    })
   }, [])
 
   const notify = useCallback(
     (message, type = 'success') => {
+      const key = `${type}:${message}`
+      if (activeKeys.current.has(key)) return
       const id = crypto.randomUUID()
+      activeKeys.current.set(key, id)
       setToasts((prev) => [...prev.slice(-3), { id, message, type }])
       setTimeout(() => dismiss(id), type === 'error' ? 6000 : 3500)
     },

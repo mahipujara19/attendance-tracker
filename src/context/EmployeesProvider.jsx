@@ -33,9 +33,16 @@ export default function EmployeesProvider({ children }) {
     setReloadKey((key) => key + 1)
   }, [])
 
+  // If loading failed, try again automatically as soon as the connection comes back.
+  useEffect(() => {
+    if (status !== 'error') return
+    window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+  }, [status, retry])
+
   const employees = useMemo(() => {
     const removed = new Set(removedIds)
-    return [...remote.filter((e) => !removed.has(e.id)), ...added]
+    return [...remote, ...added].filter((e) => !removed.has(e.id))
   }, [remote, added, removedIds])
 
   const departments = useMemo(
@@ -54,18 +61,15 @@ export default function EmployeesProvider({ children }) {
 
   const removeEmployee = useCallback(
     async (employee) => {
-      if (employee.source === 'local') {
-        // Locally added people never existed on DummyJSON, so there is nothing to delete remotely.
-        setAdded((prev) => prev.filter((e) => e.id !== employee.id))
-        return
-      }
-      await deleteEmployee(employee.id)
+      // Locally added people never existed on DummyJSON, so there is nothing to delete remotely.
+      if (employee.source !== 'local') await deleteEmployee(employee.id)
+      // Removal is a soft delete for everyone, so "Restore removed" can bring anyone back.
       setRemovedIds((prev) => (prev.includes(employee.id) ? prev : [...prev, employee.id]))
     },
-    [setAdded, setRemovedIds],
+    [setRemovedIds],
   )
 
-  const restoreDefaults = useCallback(() => setRemovedIds([]), [setRemovedIds])
+  const restoreRemoved = useCallback(() => setRemovedIds([]), [setRemovedIds])
 
   const value = useMemo(
     () => ({
@@ -76,10 +80,10 @@ export default function EmployeesProvider({ children }) {
       retry,
       addEmployee,
       removeEmployee,
-      restoreDefaults,
+      restoreRemoved,
       removedCount: removedIds.length,
     }),
-    [employees, departments, status, error, retry, addEmployee, removeEmployee, restoreDefaults, removedIds.length],
+    [employees, departments, status, error, retry, addEmployee, removeEmployee, restoreRemoved, removedIds.length],
   )
 
   return <EmployeesContext.Provider value={value}>{children}</EmployeesContext.Provider>
