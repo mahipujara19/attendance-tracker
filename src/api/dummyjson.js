@@ -69,6 +69,17 @@ export async function createEmployee({ firstName, lastName, email, phone, depart
   return { ...toEmployee(user, 'local'), id: `local-${Date.now()}` }
 }
 
+export async function updateEmployee(id, { firstName, lastName, email, phone, department, title }) {
+  const { data } = await api.put(`/users/${id}`, {
+    firstName,
+    lastName,
+    email,
+    phone,
+    company: { department, title },
+  })
+  return data
+}
+
 export async function deleteEmployee(id) {
   const { data } = await api.delete(`/users/${id}`)
   return data

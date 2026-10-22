@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createEmployee, deleteEmployee, fetchEmployees, isCancelled } from '../api/dummyjson'
+import { createEmployee, deleteEmployee, fetchEmployees, isCancelled, updateEmployee as putEmployee } from '../api/dummyjson'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { EmployeesContext } from './contexts'
+
+function withFields(employee, fields) {
+  return { ...employee, ...fields, name: `${fields.firstName} ${fields.lastName}`.trim() }
+}
 
 export default function EmployeesProvider({ children }) {
   const [remote, setRemote] = useState([])
@@ -11,6 +15,8 @@ export default function EmployeesProvider({ children }) {
 
   const [added, setAdded] = useLocalStorage('attendly.employees.added', [])
   const [removedIds, setRemovedIds] = useLocalStorage('attendly.employees.removed', [])
+  // DummyJSON doesn't persist updates, so edits to its employees are kept here: { [id]: fields }.
+  const [edits, setEdits] = useLocalStorage('attendly.employees.edited', {})
 
   useEffect(() => {
     const controller = new AbortController()
@@ -42,8 +48,10 @@ export default function EmployeesProvider({ children }) {
 
   const employees = useMemo(() => {
     const removed = new Set(removedIds)
-    return [...remote, ...added].filter((e) => !removed.has(e.id))
-  }, [remote, added, removedIds])
+    return [...remote, ...added]
+      .filter((e) => !removed.has(e.id))
+      .map((e) => (edits[e.id] ? withFields(e, edits[e.id]) : e))
+  }, [remote, added, removedIds, edits])
 
   const departments = useMemo(
     () => [...new Set(employees.map((e) => e.department))].sort((a, b) => a.localeCompare(b)),
@@ -59,17 +67,29 @@ export default function EmployeesProvider({ children }) {
     [setAdded],
   )
 
+  const updateEmployee = useCallback(
+    async (employee, fields) => {
+      if (employee.source === 'local') {
+        // Locally added people only live in localStorage, so update them there.
+        setAdded((prev) => prev.map((e) => (e.id === employee.id ? withFields(e, fields) : e)))
+      } else {
+        await putEmployee(employee.id, fields)
+        setEdits((prev) => ({ ...prev, [employee.id]: fields }))
+      }
+      return withFields(employee, fields)
+    },
+    [setAdded, setEdits],
+  )
+
   const removeEmployee = useCallback(
     async (employee) => {
       // Locally added people never existed on DummyJSON, so there is nothing to delete remotely.
       if (employee.source !== 'local') await deleteEmployee(employee.id)
-      // Removal is a soft delete for everyone, so "Restore removed" can bring anyone back.
+      // DummyJSON doesn't really delete, so remember removed ids to keep them hidden after a refetch.
       setRemovedIds((prev) => (prev.includes(employee.id) ? prev : [...prev, employee.id]))
     },
     [setRemovedIds],
   )
-
-  const restoreRemoved = useCallback(() => setRemovedIds([]), [setRemovedIds])
 
   const value = useMemo(
     () => ({
@@ -79,11 +99,10 @@ export default function EmployeesProvider({ children }) {
       error,
       retry,
       addEmployee,
+      updateEmployee,
       removeEmployee,
-      restoreRemoved,
-      removedCount: removedIds.length,
     }),
-    [employees, departments, status, error, retry, addEmployee, removeEmployee, restoreRemoved, removedIds.length],
+    [employees, departments, status, error, retry, addEmployee, updateEmployee, removeEmployee],
   )
 
   return <EmployeesContext.Provider value={value}>{children}</EmployeesContext.Provider>

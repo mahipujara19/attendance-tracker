@@ -5,15 +5,17 @@ import Modal from './Modal'
 import { Spinner } from './States'
 
 const EMPTY = { firstName: '', lastName: '', email: '', phone: '', department: '', title: '' }
+const FIELDS = Object.keys(EMPTY)
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function validate(values, employees) {
+function validate(values, employees, editingId) {
   const errors = {}
+  const email = values.email.trim().toLowerCase()
   if (!values.firstName.trim()) errors.firstName = 'First name is required'
   if (!values.lastName.trim()) errors.lastName = 'Last name is required'
-  if (!values.email.trim()) errors.email = 'Email is required'
-  else if (!EMAIL_PATTERN.test(values.email.trim())) errors.email = 'Enter a valid email address'
-  else if (employees.some((e) => e.email.toLowerCase() === values.email.trim().toLowerCase()))
+  if (!email) errors.email = 'Email is required'
+  else if (!EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address'
+  else if (employees.some((e) => e.id !== editingId && e.email.toLowerCase() === email))
     errors.email = 'An employee with this email already exists'
   if (!values.department.trim()) errors.department = 'Department is required'
   return errors
@@ -31,16 +33,21 @@ function Field({ label, name, error, optional, ...props }) {
   )
 }
 
-export default function AddEmployeeModal({ onClose }) {
-  const { employees, departments, addEmployee } = useEmployees()
+// Add a new employee, or edit an existing one when `employee` is passed.
+export default function EmployeeFormModal({ employee = null, onClose }) {
+  const { employees, departments, addEmployee, updateEmployee } = useEmployees()
   const { notify } = useToast()
-  const [values, setValues] = useState(EMPTY)
+  const isEdit = Boolean(employee)
+  const initial = isEdit ? Object.fromEntries(FIELDS.map((f) => [f, employee[f] ?? ''])) : EMPTY
+
+  const [values, setValues] = useState(initial)
   const [touched, setTouched] = useState(false)
   const [status, setStatus] = useState('idle') // idle | submitting | error
   const [apiError, setApiError] = useState(null)
 
-  const errors = touched ? validate(values, employees) : {}
+  const errors = touched ? validate(values, employees, employee?.id) : {}
   const submitting = status === 'submitting'
+  const changed = FIELDS.some((f) => values[f].trim() !== initial[f])
 
   const handleChange = (event) => {
     setValues((prev) => ({ ...prev, [event.target.name]: event.target.value }))
@@ -49,14 +56,20 @@ export default function AddEmployeeModal({ onClose }) {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setTouched(true)
-    if (Object.keys(validate(values, employees)).length > 0) return
+    if (Object.keys(validate(values, employees, employee?.id)).length > 0) return
 
     setStatus('submitting')
     setApiError(null)
     try {
-      const trimmed = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v.trim()]))
-      const employee = await addEmployee({ ...trimmed, title: trimmed.title || 'Employee' })
-      notify(`${employee.name} was added to the team`)
+      const trimmed = Object.fromEntries(FIELDS.map((f) => [f, values[f].trim()]))
+      const input = { ...trimmed, title: trimmed.title || 'Employee' }
+      if (isEdit) {
+        const updated = await updateEmployee(employee, input)
+        notify(`${updated.name}'s details were updated`)
+      } else {
+        const created = await addEmployee(input)
+        notify(`${created.name} was added to the team`)
+      }
       onClose()
     } catch (err) {
       setApiError(err.message)
@@ -66,8 +79,8 @@ export default function AddEmployeeModal({ onClose }) {
 
   return (
     <Modal
-      title="Add employee"
-      description="They'll show up on the dashboard right away."
+      title={isEdit ? 'Edit employee' : 'Add employee'}
+      description={isEdit ? `Update ${employee.name}'s details.` : "They'll show up on the dashboard right away."}
       onClose={submitting ? () => {} : onClose}
     >
       <form onSubmit={handleSubmit} noValidate>
@@ -95,9 +108,9 @@ export default function AddEmployeeModal({ onClose }) {
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? <Spinner /> : <Icon name="plus" size={16} />}
-            {submitting ? 'Saving…' : status === 'error' ? 'Try again' : 'Add employee'}
+          <button type="submit" className="btn btn-primary" disabled={submitting || (isEdit && !changed)}>
+            {submitting ? <Spinner /> : <Icon name={isEdit ? 'check' : 'plus'} size={16} />}
+            {submitting ? 'Saving…' : status === 'error' ? 'Try again' : isEdit ? 'Save changes' : 'Add employee'}
           </button>
         </footer>
       </form>

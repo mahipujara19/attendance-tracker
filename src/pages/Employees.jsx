@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import AddEmployeeModal from '../components/AddEmployeeModal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import EmployeeFormModal from '../components/EmployeeFormModal'
 import Icon from '../components/Icon'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { DepartmentSelect, SearchInput } from '../components/Toolbar'
@@ -9,12 +9,13 @@ import { isWeekend } from '../utils/date'
 import { matchesQuery } from '../utils/filters'
 
 export default function Employees() {
-  const { employees, departments, status, error, retry, removeEmployee, restoreRemoved, removedCount } = useEmployees()
+  const { employees, departments, status, error, retry, removeEmployee } = useEmployees()
   const { records } = useAttendance()
   const { notify } = useToast()
   const [query, setQuery] = useState('')
   const [department, setDepartment] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
+  const [editing, setEditing] = useState(null)
   const [removal, setRemoval] = useState(null) // { employee, status: 'confirm' | 'pending' | 'error', error }
 
   const totals = useMemo(() => {
@@ -55,17 +56,6 @@ export default function Employees() {
           </p>
         </div>
         <div className="header-actions">
-          {removedCount > 0 && status === 'success' && (
-            <button
-              className="btn btn-ghost"
-              onClick={() => {
-                restoreRemoved()
-                notify(`Restored ${removedCount} removed ${removedCount === 1 ? 'employee' : 'employees'}`, 'info')
-              }}
-            >
-              <Icon name="undo" size={16} /> Restore removed ({removedCount})
-            </button>
-          )}
           <button className="btn btn-primary" onClick={() => setShowAdd(true)} disabled={status !== 'success'}>
             <Icon name="plus" size={16} /> Add employee
           </button>
@@ -102,14 +92,24 @@ export default function Employees() {
                       <strong>{employee.name}</strong>
                       <span className="muted small">{employee.title}</span>
                     </div>
-                    <button
-                      className="icon-btn danger"
-                      onClick={() => setRemoval({ employee, status: 'confirm' })}
-                      aria-label={`Remove ${employee.name}`}
-                      title="Remove employee"
-                    >
-                      <Icon name="trash" size={16} />
-                    </button>
+                    <div className="card-actions">
+                      <button
+                        className="icon-btn"
+                        onClick={() => setEditing(employee)}
+                        aria-label={`Edit ${employee.name}`}
+                        title="Edit employee"
+                      >
+                        <Icon name="edit" size={16} />
+                      </button>
+                      <button
+                        className="icon-btn danger"
+                        onClick={() => setRemoval({ employee, status: 'confirm' })}
+                        aria-label={`Remove ${employee.name}`}
+                        title="Remove employee"
+                      >
+                        <Icon name="trash" size={16} />
+                      </button>
+                    </div>
                   </div>
                   <div className="employee-meta">
                     <span className="chip">
@@ -135,12 +135,13 @@ export default function Employees() {
         )}
       </section>
 
-      {showAdd && <AddEmployeeModal onClose={() => setShowAdd(false)} />}
+      {showAdd && <EmployeeFormModal onClose={() => setShowAdd(false)} />}
+      {editing && <EmployeeFormModal employee={editing} onClose={() => setEditing(null)} />}
 
       {removal && (
         <ConfirmDialog
           title={`Remove ${removal.employee.name}?`}
-          message={`They'll be hidden from the team. You can bring them back, with their attendance history, using "Restore removed".`}
+          message={`Are you sure you want to delete??`}
           confirmLabel="Remove"
           pending={removal.status === 'pending'}
           error={removal.status === 'error' ? `Couldn't remove employee: ${removal.error}` : null}

@@ -444,6 +444,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .employee-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
 .employee-head { display: flex; align-items: center; gap: 12px; }
+.card-actions { display: flex; gap: 2px; flex-shrink: 0; }
 .employee-meta { display: flex; gap: 6px; flex-wrap: wrap; }
 .employee-email {
   display: flex;
