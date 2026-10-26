@@ -1,19 +1,26 @@
 import { useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import EmployeeFormModal from '../components/EmployeeFormModal'
 import Icon from '../components/Icon'
+import Pagination from '../components/Pagination'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { DepartmentSelect, SearchInput } from '../components/Toolbar'
 import { useAttendance, useEmployees, useToast } from '../hooks/useApp'
+import { useUrlParams } from '../hooks/useUrlParams'
 import { isWeekend } from '../utils/date'
 import { matchesQuery } from '../utils/filters'
+
+const PAGE_SIZE = 6
 
 export default function Employees() {
   const { employees, departments, status, error, retry, removeEmployee } = useEmployees()
   const { records } = useAttendance()
   const { notify } = useToast()
-  const [query, setQuery] = useState('')
-  const [department, setDepartment] = useState('all')
+  const location = useLocation()
+  const [params, setParams] = useUrlParams({ q: '', dept: 'all', page: '1' })
+  const query = params.q
+  const department = params.dept
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState(null)
   const [removal, setRemoval] = useState(null) // { employee, status: 'confirm' | 'pending' | 'error', error }
@@ -33,6 +40,22 @@ export default function Employees() {
   const visible = employees.filter(
     (e) => matchesQuery(e, query) && (department === 'all' || e.department === department),
   )
+
+  // The page lives in the URL (?page=2) so "Back to employees" returns to the same page.
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const requestedPage = Number.parseInt(params.page, 10) || 1
+  const page = Math.min(Math.max(requestedPage, 1), totalPages)
+  const pageItems = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const goToPage = (next) => {
+    setParams({ page: next }, { replace: false })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Search and filters live in the URL too, so they survive a refresh.
+  // Changing them changes the result set, so jump back to the first page.
+  const changeQuery = (value) => setParams({ q: value, page: 1 })
+  const changeDepartment = (value) => setParams({ dept: value, page: 1 })
 
   const confirmRemoval = async () => {
     const { employee } = removal
@@ -64,8 +87,8 @@ export default function Employees() {
 
       <section className="card">
         <div className="card-toolbar">
-          <SearchInput value={query} onChange={setQuery} placeholder="Search name, email, role…" />
-          <DepartmentSelect value={department} onChange={setDepartment} departments={departments} />
+          <SearchInput value={query} onChange={changeQuery} placeholder="Search name, email, role…" />
+          <DepartmentSelect value={department} onChange={changeDepartment} departments={departments} />
         </div>
 
         {status === 'loading' && <LoadingState label="Loading employees" />}
@@ -83,13 +106,19 @@ export default function Employees() {
 
         {status === 'success' && visible.length > 0 && (
           <ul className="employee-grid">
-            {visible.map((employee) => {
+            {pageItems.map((employee) => {
               const t = totals[employee.id] ?? { present: 0, absent: 0 }
               return (
                 <li key={employee.id} className="employee-card">
                   <div className="employee-head">
                     <div className="person">
-                      <strong>{employee.name}</strong>
+                      <Link
+                        className="stretched-link"
+                        to={`/employees/${employee.id}`}
+                        state={{ from: location.search }}
+                      >
+                        <strong>{employee.name}</strong>
+                      </Link>
                       <span className="muted small">{employee.title}</span>
                     </div>
                     <div className="card-actions">
@@ -132,6 +161,10 @@ export default function Employees() {
               )
             })}
           </ul>
+        )}
+
+        {status === 'success' && visible.length > 0 && (
+          <Pagination page={page} pageSize={PAGE_SIZE} total={visible.length} onChange={goToPage} />
         )}
       </section>
 

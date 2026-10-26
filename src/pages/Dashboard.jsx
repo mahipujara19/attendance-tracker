@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Icon from '../components/Icon'
 import StatCard from '../components/StatCard'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { DepartmentSelect, SearchInput } from '../components/Toolbar'
 import { useAttendance, useEmployees, useToast } from '../hooks/useApp'
+import { useUrlParams } from '../hooks/useUrlParams'
 import { addDays, formatLong, isValidKey, isWeekend, todayKey } from '../utils/date'
 import { matchesQuery } from '../utils/filters'
 
@@ -43,20 +44,25 @@ export default function Dashboard() {
   const { employees, departments, status, error, retry } = useEmployees()
   const { records, mark, markMany, clearDay } = useAttendance()
   const { notify } = useToast()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [query, setQuery] = useState('')
-  const [department, setDepartment] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [params, setParams] = useUrlParams({ date: '', q: '', dept: 'all', status: 'all' })
   const [confirmClear, setConfirmClear] = useState(false)
 
+  const query = params.q
+  const department = params.dept
+  const statusFilter = params.status
+  const setQuery = (value) => setParams({ q: value })
+  const setDepartment = (value) => setParams({ dept: value })
+  const setStatusFilter = (value) => setParams({ status: value })
+  const clearFilters = () => setParams({ q: '', dept: 'all', status: 'all' })
+
   const today = todayKey()
-  const requested = searchParams.get('date')
+  const requested = params.date
   const date = isValidKey(requested) && requested <= today ? requested : today
   const isToday = date === today
   const weeklyOff = isWeekend(date)
   const day = useMemo(() => records[date] ?? {}, [records, date])
 
-  const setDate = (key) => setSearchParams(key === today ? {} : { date: key })
+  const setDate = (key) => setParams({ date: key === today ? '' : key }, { replace: false })
 
   const stats = useMemo(() => {
     let present = 0
@@ -232,11 +238,7 @@ export default function Dashboard() {
           <EmptyState icon="search" title="No matches" message="Try a different search or filter.">
             <button
               className="btn btn-ghost"
-              onClick={() => {
-                setQuery('')
-                setDepartment('all')
-                setStatusFilter('all')
-              }}
+              onClick={clearFilters}
             >
               Clear filters
             </button>

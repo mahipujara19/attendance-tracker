@@ -57,6 +57,22 @@ export async function fetchEmployees({ signal } = {}) {
   return data.users.map((user) => toEmployee(user))
 }
 
+export async function fetchEmployeeProfile(id, { signal } = {}) {
+  const fields = 'age,gender,birthDate,bloodGroup,university,address,company'
+  const { data } = await api.get(`/users/${id}`, { params: { select: fields }, signal })
+  return {
+    age: data.age,
+    gender: data.gender,
+    birthDate: data.birthDate,
+    bloodGroup: data.bloodGroup,
+    university: data.university,
+    company: data.company?.name,
+    address: [data.address?.address, data.address?.city, data.address?.state, data.address?.country]
+      .filter(Boolean)
+      .join(', '),
+  }
+}
+
 export async function createEmployee({ firstName, lastName, email, phone, department, title }) {
   const { data: user } = await api.post('/users/add', {
     firstName,

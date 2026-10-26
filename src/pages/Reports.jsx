@@ -4,6 +4,7 @@ import StatCard from '../components/StatCard'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { DepartmentSelect, SearchInput } from '../components/Toolbar'
 import { useAttendance, useEmployees, useToast } from '../hooks/useApp'
+import { useUrlParams } from '../hooks/useUrlParams'
 import { addDays, daysBetween, formatShort, isValidKey, isWeekend, listDays, startOfMonth, todayKey } from '../utils/date'
 import { matchesQuery } from '../utils/filters'
 
@@ -63,8 +64,12 @@ export default function Reports() {
 
   const [preset, setPreset] = useState('7')
   const [custom, setCustom] = useState(() => presetRange('7', today))
-  const [query, setQuery] = useState('')
-  const [department, setDepartment] = useState('all')
+  // Search and department filter live in the URL so they survive a refresh.
+  const [params, setParams] = useUrlParams({ q: '', dept: 'all' })
+  const query = params.q
+  const department = params.dept
+  const setQuery = (value) => setParams({ q: value })
+  const setDepartment = (value) => setParams({ dept: value })
   const [sort, setSort] = useState({ key: 'rate', dir: 'desc' })
 
   const { from, to } = preset === 'custom' ? custom : presetRange(preset, today)
