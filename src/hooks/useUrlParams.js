@@ -10,7 +10,7 @@ export function useUrlParams(defaults) {
   )
 
   // `replace: true` (default) avoids a history entry per keystroke; pass false for real navigation.
-  const update = (changes, { replace = true } = {}) => {
+  const update = (changes, { replace = false } = {}) => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev)
